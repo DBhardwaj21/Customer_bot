@@ -32,10 +32,10 @@ def ask():
         # If there's an error processing the query, return an error message
         return jsonify({"error": f"An error occurred while processing the query: {str(e)}"}), 500
 
-if __name__ == "__main__":
-    # Run the Flask app
-    # This will start the API on http://0.0.0.0:5000 by default
-    app.run(host="0.0.0.0", port=5000, debug=True)
+# if __name__ == "__main__":
+#     # Run the Flask app
+#     # This will start the API on http://0.0.0.0:5000 by default
+#     app.run(host="0.0.0.0", port=5000, debug=True)
 
 import os
 
