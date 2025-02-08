@@ -1,45 +1,73 @@
+#!/usr/bin/env python3
 from flask import Flask, request, jsonify
-from chat_pdf import ChatPDF  # Import your chatbot class (make sure it's in the same directory)
-from flask_cors import CORS
+from chat_pdf import ChatPDF  # Import your existing ChatPDF class
+import os
+import logging
+
+# Initialize Flask app
 app = Flask(__name__)
-CORS(app)
-# Initialize the chatbot instance
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+# Configuration
+PDF_FILE_PATH = "C:\\Users\\FA0555TX\\Desktop\\kaam\\local-assistant-examples\\simple-rag\\Data.pdf"
+
+# Initialize ChatPDF
 chat_pdf = ChatPDF()
 
-# Ingest the PDF document before starting the API
-# You can replace "Data.pdf" with the correct path if needed
-chat_pdf.ingest("Data.pdf")
+# Load the PDF file once at startup
+if os.path.exists(PDF_FILE_PATH):
+    chat_pdf.ingest(PDF_FILE_PATH)
+else:
+    raise FileNotFoundError(f"PDF file not found at {PDF_FILE_PATH}")
 
+# API Endpoints
 @app.route("/ask", methods=["POST"])
 def ask():
     """
-    Endpoint to ask questions to the chatbot.
-    Accepts a JSON payload with a 'query' field.
+    Endpoint to ask a question to the chatbot.
+    Expects a JSON payload with a "query" field.
     """
-    # Get the question from the request body
     data = request.get_json()
-    query = data.get("query", "")
-    
-    # If no question is provided, return an error
-    if not query:
-        return jsonify({"error": "No question provided"}), 400
+    if not data or "query" not in data:
+        return jsonify({"error": "Missing 'query' in request body"}), 400
 
-    # Get the response from the chatbot
+    query = data["query"]
+    logger.debug(f"Received query: {query}")
+
     try:
-        answer = chat_pdf.ask(query)
-        return jsonify({"answer": answer})
+        # Stream the response and collect it
+        response_chunks = []
+        for chunk in chat_pdf.ask(query):
+            response_chunks.append(chunk)
+            logger.debug(f"Streamed chunk: {chunk}")
+
+        response = "".join(response_chunks)
+        logger.debug(f"Final response: {response}")
+
+        return jsonify({"response": response})
     except Exception as e:
-        # If there's an error processing the query, return an error message
-        return jsonify({"error": f"An error occurred while processing the query: {str(e)}"}), 500
+        logger.error(f"Error processing query: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
-# if __name__ == "__main__":
-#     # Run the Flask app
-#     # This will start the API on http://0.0.0.0:5000 by default
-#     app.run(host="0.0.0.0", port=5000, debug=True)
+@app.route("/status", methods=["GET"])
+def status():
+    """
+    Endpoint to check the status of the API.
+    """
+    return jsonify({"status": "running", "message": "ChatPDF API is operational"})
 
-import os
+# Error handlers
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"error": "Endpoint not found"}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Use Render's PORT or default to 5000
-    app.run(host="0.0.0.0", port=port, debug=False)  # Turn debug off in production
-
+    # Run the Flask app
+    app.run(host="0.0.0.0", port=5000, debug=True)
